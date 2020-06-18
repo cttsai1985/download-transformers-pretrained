@@ -1,0 +1,8 @@
+version: "3"
+services:
+  transformer_model_download:  # main
+    image: huggingface/transformers-cpu
+    volumes:
+      - ${PWD}:/download
+    working_dir: /download/script
+    command: python3 download.py -r ../configs/download.txt --output-dir ../models
