@@ -10,7 +10,6 @@ To download transformers' models for tensorflow:
 
 Modify `./configs/download.txt` to download different models.
 
-## Ouput
+## Output
 The default path to save ins at a newly created folder: `./models`
-Note it will take up several GB in DiskDrivbe due to those large models.
-
+Note it will take up several GB in disk space due to those large models.
