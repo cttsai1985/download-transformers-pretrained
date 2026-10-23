@@ -1,4 +1,4 @@
-name: Offline regression tests
+name: Downloader regression and hfrs integration
 
 on: [push, pull_request]
 
@@ -6,11 +6,30 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  test-and-hfrs-smoke:
     runs-on: ubuntu-latest
+    env:
+      CARGO_HOME: ${{ runner.temp }}/cargo-home
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: python -m unittest discover -s tests -v
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned official hfrs CLI
+        run: |
+          cargo install --locked \
+            --root "$RUNNER_TEMP/hfrs" \
+            --git https://github.com/huggingface/hf-hub.git \
+            --rev 473de9430b0fbc544fb1d91102180eb713f8dc87 \
+            hfrs
+          echo "$RUNNER_TEMP/hfrs/bin" >> "$GITHUB_PATH"
+      - name: Check hfrs command and download a small public config
+        run: |
+          hfrs download --help
+          python script/download.py \
+            --model gpt2 \
+            --include config.json \
+            --output-dir "$RUNNER_TEMP/hf-models"
+          test -f "$RUNNER_TEMP/hf-models/gpt2/config.json"
