@@ -1,19 +1,19 @@
-import os
 import argparse
 from typing import Union
 from pathlib import Path
 
 import transformers
-from transformers import AutoConfig, AutoTokenizer, AutoModel, TFAutoModel
+from transformers import AutoTokenizer, AutoModel
 
 
 def mkdir(dir_path: Union[str, Path]) -> bool:
-    if os.path.isdir(dir_path):
+    dir_path = Path(dir_path)
+    if dir_path.is_dir():
         print(f"Skip created directory: {dir_path}")
         return True
 
     try:
-        os.mkdir(dir_path)
+        dir_path.mkdir(parents=True, exist_ok=True)
         print(f"Successfully created directory: {dir_path}")
 
     except OSError:
@@ -27,6 +27,8 @@ def transformers_dowloader(
         pretrained_model_name: str, working_dir: Union[str, Path], is_tf: bool = True) -> bool:
     model_class = AutoModel
     if is_tf:
+        from transformers import TFAutoModel
+
         model_class = TFAutoModel
 
     print(f"Download model and tokenizer for: {pretrained_model_name}")
@@ -34,9 +36,10 @@ def transformers_dowloader(
     transformer_tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name)
     #
 
-    output_dir = working_dir / pretrained_model_name
+    output_dir = Path(working_dir) / pretrained_model_name
     try:
-        mkdir(dir_path=output_dir)
+        if not mkdir(dir_path=output_dir):
+            return False
         transformer_model.save_pretrained(output_dir)
         transformer_tokenizer.save_pretrained(output_dir)
         print(f"Save model and tokenizer {pretrained_model_name} in directory {output_dir}")
@@ -49,8 +52,9 @@ def transformers_dowloader(
 
 
 def main():
-    default_output_dir: str = "../models"
-    default_data_filename: str = "models_to_download.txt"
+    project_dir = Path(__file__).resolve().parents[1]
+    default_output_dir: str = str(project_dir / "models")
+    default_data_filename: str = str(project_dir / "configs" / "download.txt")
 
     parser = argparse.ArgumentParser(
         description="Transformers Pretrained Models Downloader", add_help=True,
@@ -59,7 +63,7 @@ def main():
     parser.add_argument(
         "--requirement", "-r", type=str, default=default_data_filename, help="file of model to download")
     parser.add_argument("--model", "-m", type=str, default=None, help="filename of data")
-    parser.add_argument("--tensorflow", action="store_true", default=False, help="cross val group split")
+    parser.add_argument("--tensorflow", action="store_true", default=False, help="download TensorFlow weights")
     args = parser.parse_args()
 
     pretrained_model_name_list = [args.model]
@@ -74,12 +78,15 @@ def main():
 
     print(f'Transformers version {transformers.__version__}')
     working_dir = Path(args.output_dir)
-    mkdir(working_dir)
+    if not mkdir(working_dir):
+        return 1
 
+    success = True
     for model_name in pretrained_model_name_list:
-        transformers_dowloader(model_name, working_dir=working_dir, is_tf=args.tensorflow)
-    return
+        if not transformers_dowloader(model_name, working_dir=working_dir, is_tf=args.tensorflow):
+            success = False
+    return 0 if success else 1
 
 
 if "__main__" == __name__:
-    main()
+    raise SystemExit(main())
