@@ -2,6 +2,7 @@
 
 import builtins
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -29,6 +30,37 @@ def load_downloader():
 
 
 class DownloaderTests(TestCase):
+    def test_output_environment_sets_default_directory(self):
+        downloader = load_downloader()
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"HF_DOWNLOADER_OUTPUT_DIR": directory}
+        ), patch.object(sys, "argv", [str(SCRIPT), "--model", "model"]), patch.object(
+            subprocess, "run", return_value=subprocess.CompletedProcess([], 0)
+        ) as run:
+            self.assertEqual(downloader.main(), 0)
+
+        self.assertEqual(
+            run.call_args.args[0][4],
+            str((Path(directory) / "model").resolve()),
+        )
+
+    def test_cli_output_directory_overrides_environment(self):
+        downloader = load_downloader()
+        with tempfile.TemporaryDirectory() as default_directory, tempfile.TemporaryDirectory() as explicit_directory:
+            with patch.dict(os.environ, {"HF_DOWNLOADER_OUTPUT_DIR": default_directory}), patch.object(
+                sys,
+                "argv",
+                [str(SCRIPT), "--model", "model", "--output-dir", explicit_directory],
+            ), patch.object(
+                subprocess, "run", return_value=subprocess.CompletedProcess([], 0)
+            ) as run:
+                self.assertEqual(downloader.main(), 0)
+
+        self.assertEqual(
+            run.call_args.args[0][4],
+            str((Path(explicit_directory) / "model").resolve()),
+        )
+
     def test_default_requirement_file_is_loaded(self):
         downloader = load_downloader()
         with tempfile.TemporaryDirectory() as directory, patch.object(
