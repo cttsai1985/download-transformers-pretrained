@@ -8,8 +8,6 @@ permissions:
 jobs:
   test-and-hfrs-smoke:
     runs-on: ubuntu-latest
-    env:
-      CARGO_HOME: ${{ runner.temp }}/cargo-home
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,6 +16,8 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - uses: dtolnay/rust-toolchain@stable
       - name: Install pinned official hfrs CLI
+        env:
+          CARGO_HOME: ${{ runner.temp }}/cargo-home
         run: |
           cargo install --locked \
             --root "$RUNNER_TEMP/hfrs" \
