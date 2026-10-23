@@ -1,4 +1,4 @@
-name: Downloader regression and hfrs integration
+name: Downloader regression and container integration
 
 on:
   push:
@@ -13,41 +13,64 @@ permissions:
   contents: read
 
 jobs:
-  test-and-hfrs-smoke:
+  test-and-container-smoke:
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m unittest discover -s tests -v
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Restore pinned hfrs and Cargo cache
-        id: hfrs-cache
-        uses: actions/cache@v4
+      - name: Run offline regression tests
+        run: python -m unittest discover -s tests -v
+      - uses: docker/setup-buildx-action@v4
+      - name: Build standalone image
+        uses: docker/build-push-action@v7
         with:
-          path: |
-            ${{ runner.temp }}/cargo-home/registry
-            ${{ runner.temp }}/cargo-home/git
-            ${{ runner.temp }}/hfrs/bin/hfrs
-          key: hfrs-${{ runner.os }}-${{ runner.arch }}-ubuntu-26.04-473de9430b0fbc544fb1d91102180eb713f8dc87
-      - name: Install pinned official hfrs CLI
-        if: steps.hfrs-cache.outputs.cache-hit != 'true'
-        env:
-          CARGO_HOME: ${{ runner.temp }}/cargo-home
+          context: .
+          load: true
+          tags: download-transformers-pretrained:ci
+          cache-from: type=gha,scope=standalone-downloader
+          cache-to: type=gha,scope=standalone-downloader,mode=max
+      - name: Check image user and run mounted-list download
+        shell: bash
         run: |
-          cargo install --locked \
-            --root "$RUNNER_TEMP/hfrs" \
-            --git https://github.com/huggingface/hf-hub.git \
-            --rev 473de9430b0fbc544fb1d91102180eb713f8dc87 \
-            hfrs
-      - name: Add hfrs to PATH
-        run: echo "$RUNNER_TEMP/hfrs/bin" >> "$GITHUB_PATH"
-      - name: Check hfrs command and download a small public config
+          image=download-transformers-pretrained:ci
+          test "$(docker image inspect "$image" --format '{{.Config.User}}')" = '10001:10001'
+          docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m "$image" --help
+          smoke_dir="$RUNNER_TEMP/downloader-smoke"
+          mkdir -p "$smoke_dir/models" "$smoke_dir/cache"
+          chmod 755 "$smoke_dir" "$smoke_dir/models" "$smoke_dir/cache"
+          printf 'gpt2\n' > "$smoke_dir/models.txt"
+          docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --user "$(id -u):$(id -g)" \
+            -v "$smoke_dir/models.txt:/config/models.txt:ro" \
+            -v "$smoke_dir/models:/models" \
+            -v "$smoke_dir/cache:/cache" \
+            "$image" --requirement /config/models.txt \
+            --include config.json --include config.json
+          test -s "$smoke_dir/models/gpt2/config.json"
+      - name: Check official hfrs cache path and download
+        shell: bash
         run: |
-          hfrs download --help
-          python script/download.py \
-            --model gpt2 \
-            --include config.json \
-            --output-dir "$RUNNER_TEMP/hf-models"
-          test -f "$RUNNER_TEMP/hf-models/gpt2/config.json"
+          image=download-transformers-pretrained:ci
+          cache_dir="$RUNNER_TEMP/downloader-smoke/cache"
+          env_output=$(docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --user "$(id -u):$(id -g)" -v "$cache_dir:/cache" \
+            --entrypoint hfrs "$image" env)
+          grep -F 'HF_HUB_CACHE: /cache/huggingface/hub' <<< "$env_output"
+          docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --user "$(id -u):$(id -g)" -v "$cache_dir:/cache" \
+            --entrypoint hfrs "$image" download gpt2 config.json --quiet
+          test -n "$(find "$cache_dir/huggingface/hub/models--gpt2" -type f -size +0c -print -quit)"
+      - name: Export tested standalone image
+        run: |
+          docker tag download-transformers-pretrained:ci download-transformers-pretrained:standalone
+          docker save download-transformers-pretrained:standalone -o "$RUNNER_TEMP/download-transformers-pretrained-linux-amd64.tar"
+      - name: Upload tested standalone image
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: download-transformers-pretrained-linux-amd64-${{ github.sha }}
+          path: ${{ runner.temp }}/download-transformers-pretrained-linux-amd64.tar
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
