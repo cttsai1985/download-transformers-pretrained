@@ -82,6 +82,10 @@ The image contains the Python standard library, the batch wrapper, and pinned
 official `hfrs` 1.0.0. It does not include Python ML frameworks, a Rust
 toolchain, model weights, credentials, or host cache files.
 
+For maintainers running the wrapper directly, put the same pinned official
+`hfrs` CLI on `PATH` and run `python script/download.py`; this optional path
+uses the standard library and keeps the native `./models` output default.
+
 ## Offline regression tests
 
 The unit suite requires only Python 3.10+ and performs no Hub or model
