@@ -1,6 +1,7 @@
 """Download Hugging Face repository snapshots with the official hfrs CLI."""
 
 import argparse
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -64,6 +65,7 @@ def download_model(output_root: Path, repo_id: str, include: list[str]) -> bool:
 
 
 def build_parser(project_dir: Path) -> argparse.ArgumentParser:
+    default_output_dir = os.environ.get("HF_DOWNLOADER_OUTPUT_DIR", str(project_dir / "models"))
     parser = argparse.ArgumentParser(
         description="Batch-download Hugging Face repositories with the official hfrs CLI",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -71,7 +73,7 @@ def build_parser(project_dir: Path) -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=project_dir / "models",
+        default=default_output_dir,
         help="folder in which repository snapshots are saved",
     )
     parser.add_argument(
