@@ -1,13 +1,20 @@
 name: Downloader regression and hfrs integration
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: downloader-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   test-and-hfrs-smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -15,7 +22,17 @@ jobs:
           python-version: '3.12'
       - run: python -m unittest discover -s tests -v
       - uses: dtolnay/rust-toolchain@stable
+      - name: Restore pinned hfrs and Cargo cache
+        id: hfrs-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/cargo-home/registry
+            ${{ runner.temp }}/cargo-home/git
+            ${{ runner.temp }}/hfrs/bin/hfrs
+          key: hfrs-${{ runner.os }}-${{ runner.arch }}-ubuntu-26.04-473de9430b0fbc544fb1d91102180eb713f8dc87
       - name: Install pinned official hfrs CLI
+        if: steps.hfrs-cache.outputs.cache-hit != 'true'
         env:
           CARGO_HOME: ${{ runner.temp }}/cargo-home
         run: |
@@ -24,7 +41,8 @@ jobs:
             --git https://github.com/huggingface/hf-hub.git \
             --rev 473de9430b0fbc544fb1d91102180eb713f8dc87 \
             hfrs
-          echo "$RUNNER_TEMP/hfrs/bin" >> "$GITHUB_PATH"
+      - name: Add hfrs to PATH
+        run: echo "$RUNNER_TEMP/hfrs/bin" >> "$GITHUB_PATH"
       - name: Check hfrs command and download a small public config
         run: |
           hfrs download --help
