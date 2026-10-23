@@ -29,6 +29,17 @@ def load_downloader():
 
 
 class DownloaderTests(TestCase):
+    def test_default_requirement_file_is_loaded(self):
+        downloader = load_downloader()
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            sys, "argv", [str(SCRIPT), "--output-dir", directory]
+        ), patch.object(
+            subprocess, "run", return_value=subprocess.CompletedProcess([], 0)
+        ) as run:
+            self.assertEqual(downloader.main(), 0)
+
+        self.assertEqual(run.call_args_list[0].args[0][2], "bert-base-uncased")
+
     def test_single_model_uses_official_cli_and_namespaced_output(self):
         downloader = load_downloader()
         with tempfile.TemporaryDirectory() as directory, patch.object(
