@@ -1,34 +1,60 @@
 # download-transformers-pretrained
-This scripts aims to download transfomers models and configs using docker.
+
+Batch-download model repository snapshots from Hugging Face with the official
+Rust CLI, `hfrs`. The Python entry point uses only the standard library; it
+delegates network transfer, authentication, caching, retries, and file selection
+to `hfrs`.
+
+## Install the official CLI
+
+This project uses the verified `hfrs` 1.0.0 source revision. Install it with a
+Rust toolchain and Cargo:
+
+```sh
+cargo install --locked \
+  --git https://github.com/huggingface/hf-hub.git \
+  --rev 473de9430b0fbc544fb1d91102180eb713f8dc87 \
+  hfrs
+```
+
+Ensure Cargo's `bin` directory is on `PATH`. `hfrs` uses the official Hub CLI
+authentication settings, including `HF_TOKEN` for gated or private repositories.
 
 ## Usage
-To download transformers' models for pytorch:
-```docker-compose up```
 
-To download transformers' models for tensorflow:
-```docker-compose -f docker-compose-tf.yml up```
-
-Modify `./configs/download.txt` to download different models.
-
-With PyTorch and Transformers installed, you can also run the downloader directly:
+Edit `configs/download.txt` to choose repositories, then run:
 
 ```sh
 python script/download.py
-python script/download.py --model org/model --output-dir ./models
 ```
 
-The default model list and output path are resolved relative to this repository,
-so direct execution also works from another working directory. Namespaced model
-IDs create matching nested directories. A failed download or save exits nonzero.
-TensorFlow mode requires a Transformers version that provides `TFAutoModel` and
-a compatible TensorFlow installation; PyTorch mode does not import this class.
+Download one repository or filter downloaded files:
 
-Run the offline regression suite without installing Transformers or downloading models:
+```sh
+python script/download.py --model org/model --output-dir ./models
+python script/download.py --model gpt2 --include config.json --output-dir ./models
+```
+
+The list file accepts one repository ID per line; blank lines and lines starting
+with `#` are ignored. `--include` may be repeated and applies to every repository
+in the selected list. The default output directory is `./models` beside this
+repository, and each snapshot is saved under `<output-dir>/<repo-id>` (for
+example, `models/org/model`). The wrapper attempts every listed repository and
+exits nonzero if any download fails.
+
+The downloader saves repository files as published on Hugging Face. It does not
+load models through Transformers or convert them with `save_pretrained`. The
+former `--tensorflow` option is retired and returns a migration error. The old
+Docker Compose routes have been removed.
+
+## Offline regression tests
+
+The unit suite requires no Hugging Face, PyTorch, TensorFlow, or model downloads:
 
 ```sh
 python -m unittest discover -s tests -v
 ```
 
-## Output
-The default path to save ins at a newly created folder: `./models`
-Note it will take up several GB in disk space due to those large models.
+CI also installs the pinned official `hfrs` CLI in its temporary runner
+directory and downloads only the small public `gpt2/config.json` file to verify
+the wrapper-to-CLI integration.
