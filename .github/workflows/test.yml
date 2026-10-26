@@ -37,6 +37,36 @@ jobs:
           image=download-transformers-pretrained:ci
           test "$(docker image inspect "$image" --format '{{.Config.User}}')" = '10001:10001'
           docker run --rm --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m "$image" --help
+          expected_hfrs_license_sha256=8c6db340475136df3c1201d458fa5755698eace76e510471ecc9d857d6083dac
+          actual_hfrs_license_sha256=$(sha256sum licenses/hf-hub-LICENSE | cut -d ' ' -f 1)
+          test "$actual_hfrs_license_sha256" = "$expected_hfrs_license_sha256"
+          docker run --rm --read-only \
+            -v "$PWD/LICENSE:/tmp/project-LICENSE:ro" \
+            -v "$PWD/licenses/hf-hub-LICENSE:/tmp/hfrs-LICENSE:ro" \
+            -v "$PWD/THIRD_PARTY_NOTICES.md:/tmp/THIRD_PARTY_NOTICES.md:ro" \
+            --entrypoint python "$image" -B -c '
+          from hashlib import sha256
+          from pathlib import Path
+
+          licenses = Path("/usr/share/licenses/download-transformers-pretrained")
+          expected = {
+              licenses / "LICENSE": Path("/tmp/project-LICENSE"),
+              licenses / "hfrs/LICENSE": Path("/tmp/hfrs-LICENSE"),
+              licenses / "THIRD_PARTY_NOTICES.md": Path("/tmp/THIRD_PARTY_NOTICES.md"),
+          }
+          assert licenses.stat().st_mode & 0o222 == 0
+          for packaged, source in expected.items():
+              assert packaged.read_bytes() == source.read_bytes()
+              assert packaged.stat().st_mode & 0o222 == 0
+          assert sha256((licenses / "hfrs/LICENSE").read_bytes()).hexdigest() == (
+              "8c6db340475136df3c1201d458fa5755698eace76e510471ecc9d857d6083dac"
+          )
+          notices = (licenses / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+          assert "473de9430b0fbc544fb1d91102180eb713f8dc87" in notices
+          assert "not a complete, per-crate license inventory" in " ".join(notices.split())
+          assert Path("/usr/local/lib/python3.12/LICENSE.txt").is_file()
+          assert Path("/usr/share/doc/base-files/copyright").is_file()
+          '
           smoke_dir="$RUNNER_TEMP/downloader-smoke"
           mkdir -p "$smoke_dir/models" "$smoke_dir/cache"
           chmod 755 "$smoke_dir" "$smoke_dir/models" "$smoke_dir/cache"
