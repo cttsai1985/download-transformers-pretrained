@@ -53,3 +53,9 @@ target
 target/**
 dist
 build
+
+# Keep the legal inputs required by Dockerfile COPY in the build context.
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!licenses/
+!licenses/hf-hub-LICENSE
