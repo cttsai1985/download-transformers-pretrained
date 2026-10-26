@@ -21,9 +21,16 @@ ENV HOME=/home/downloader \
     PYTHONDONTWRITEBYTECODE=1
 
 RUN mkdir -p /app/script /app/configs /models /cache /home/downloader \
+    /usr/share/licenses/download-transformers-pretrained/hfrs \
+    && chmod 0555 /usr/share/licenses \
+        /usr/share/licenses/download-transformers-pretrained \
+        /usr/share/licenses/download-transformers-pretrained/hfrs \
     && chown -R 10001:10001 /app /models /cache /home/downloader
 
 COPY --from=hfrs-builder --chmod=0555 /out/bin/hfrs /usr/local/bin/hfrs
+COPY --chmod=0444 LICENSE /usr/share/licenses/download-transformers-pretrained/LICENSE
+COPY --chmod=0444 THIRD_PARTY_NOTICES.md /usr/share/licenses/download-transformers-pretrained/THIRD_PARTY_NOTICES.md
+COPY --chmod=0444 licenses/hf-hub-LICENSE /usr/share/licenses/download-transformers-pretrained/hfrs/LICENSE
 COPY --chown=10001:10001 script/download.py /app/script/download.py
 COPY --chown=10001:10001 configs/download.txt /app/configs/download.txt
 
