@@ -89,9 +89,8 @@ docker run --rm \
   --model org/private-model
 ```
 
-The token is not added to the image. The retired `--tensorflow` option returns
-a migration error; the downloader saves Hub files as published and does not
-load or convert models.
+The token is not added to the image. The downloader saves Hub files as
+published and does not load or convert models.
 
 ## License and bundled components
 

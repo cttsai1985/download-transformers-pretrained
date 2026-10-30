@@ -91,8 +91,6 @@ def build_parser(project_dir: Path) -> argparse.ArgumentParser:
         metavar="GLOB",
         help="only download files matching this glob (repeatable)",
     )
-    # Retain a focused migration error for scripts that used the retired flag.
-    parser.add_argument("--tensorflow", action="store_true", help=argparse.SUPPRESS)
     return parser
 
 
@@ -100,11 +98,6 @@ def main() -> int:
     project_dir = Path(__file__).resolve().parents[1]
     parser = build_parser(project_dir)
     args = parser.parse_args()
-    if args.tensorflow:
-        parser.error(
-            "--tensorflow is retired: hfrs downloads repository files and does not convert or save TensorFlow models"
-        )
-
     try:
         model_ids = [args.model] if args.model is not None else parse_models(args.requirement)
     except OSError as error:

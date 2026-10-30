@@ -163,12 +163,19 @@ class DownloaderTests(TestCase):
         ), patch.object(subprocess, "run", side_effect=FileNotFoundError("hfrs")):
             self.assertEqual(downloader.main(), 1)
 
-    def test_tensorflow_mode_is_rejected_with_migration_error(self):
-        downloader = load_downloader()
-        with patch.object(sys, "argv", [str(SCRIPT), "--model", "model", "--tensorflow"]):
-            with self.assertRaises(SystemExit) as error:
-                downloader.main()
-        self.assertEqual(error.exception.code, 2)
+    def test_removed_tensorflow_option_is_unrecognized(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "models"
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--tensorflow", "--output-dir", str(output)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertFalse(output.exists())
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unrecognized arguments: --tensorflow", result.stderr)
 
 
 if __name__ == "__main__":
